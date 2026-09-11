@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "bun run build",
     "dev": "vite",
     "build": "bun run provision:r2 && vite build",
     "preview": "vite preview",
