@@ -208,7 +208,7 @@ function EditorModal({
             </span>
           </label>
           <label>
-            <span>Icon</span>
+            <span>Icon <em>emoji or image up to 300 KB</em></span>
             <span className="inline-control">
               <input
                 value={draft.iconType === "emoji" ? draft.icon : ""}
@@ -608,7 +608,7 @@ function App() {
                   <span><strong>Frontend</strong><small>React + Vite + TypeScript</small></span>
                   <span><strong>Platform</strong><small>Cloudflare Workers</small></span>
                   <span><strong>Registry</strong><small>D1</small></span>
-                  <span><strong>Assets</strong><small>R2</small></span>
+                  <span><strong>Custom icons</strong><small>Stored with app data in D1</small></span>
                   <span><strong>PWA</strong><small>Installable + offline shell</small></span>
                 </div>
               </section>

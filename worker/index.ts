@@ -1,6 +1,5 @@
 interface Env {
   DB: D1Database;
-  USER_ASSETS: R2Bucket;
   ADMIN_TOKEN?: string;
 }
 
@@ -196,7 +195,7 @@ function normalizeApp(body: Record<string, unknown>, fallbackId?: string) {
     description: safeString(body.description, 300),
     url,
     category: safeString(body.category, 50) || "Personal",
-    icon: safeString(body.icon, 2048) || "✦",
+    icon: safeString(body.icon, 500_000) || "✦",
     iconType: body.iconType === "url" ? "url" : "emoji",
     accent,
     coverUrl: safeString(body.coverUrl, 2048),
@@ -313,32 +312,21 @@ async function handleApi(request: Request, env: Env) {
     const form = await request.formData();
     const value = form.get("file");
     if (!(value instanceof File)) return json({ error: "Missing file" }, { status: 400 });
-    if (value.size > 3_000_000) return json({ error: "Image must be under 3 MB" }, { status: 413 });
+    if (value.size > 300_000) return json({ error: "Icon image must be under 300 KB" }, { status: 413 });
     const allowed = new Set(["image/png","image/jpeg","image/webp","image/svg+xml"]);
     if (!allowed.has(value.type)) return json({ error: "Unsupported image format" }, { status: 415 });
 
-    const extension = value.type === "image/jpeg" ? "jpg" : value.type.split("/")[1].replace("+xml","");
-    const key = `${new Date().toISOString().slice(0,10)}/${crypto.randomUUID()}.${extension}`;
-    await env.USER_ASSETS.put(key, value.stream(), {
-      httpMetadata: { contentType: value.type, cacheControl: "public, max-age=31536000, immutable" },
-    });
-    return json({ url: `/user-assets/${key}` }, { status: 201 });
+    const bytes = new Uint8Array(await value.arrayBuffer());
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    const dataUrl = `data:${value.type};base64,${btoa(binary)}`;
+    return json({ url: dataUrl }, { status: 201 });
   }
 
   return json({ error: "Not found" }, { status: 404 });
-}
-
-async function handleAsset(request: Request, env: Env) {
-  const url = new URL(request.url);
-  const key = decodeURIComponent(url.pathname.replace(/^\/user-assets\//, ""));
-  if (!key || key.includes("..")) return new Response("Not found", { status: 404 });
-  const object = await env.USER_ASSETS.get(key);
-  if (!object) return new Response("Not found", { status: 404 });
-  const headers = new Headers();
-  object.writeHttpMetadata(headers);
-  headers.set("etag", object.httpEtag);
-  headers.set("cache-control", "public, max-age=31536000, immutable");
-  return new Response(object.body, { headers });
 }
 
 export default {
@@ -351,7 +339,6 @@ export default {
 
     try {
       if (url.pathname.startsWith("/api/")) return await handleApi(request, env);
-      if (url.pathname.startsWith("/user-assets/")) return await handleAsset(request, env);
       return new Response(null, { status: 404 });
     } catch (error) {
       console.error(error);

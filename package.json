@@ -4,14 +4,13 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "postinstall": "bun run build",
+    "postinstall": "vite build",
     "dev": "vite",
-    "build": "bun run provision:r2 && vite build",
+    "build": "vite build",
     "preview": "vite preview",
-    "deploy": "bun run build && wrangler deploy",
+    "deploy": "vite build && wrangler deploy",
     "cf-types": "wrangler types",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.worker.json",
-    "provision:r2": "wrangler r2 bucket create desktop-hodynnyk-user-assets || echo \"R2 bucket already exists or is already provisioned\""
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.worker.json"
   },
   "dependencies": {
     "react": "^19.3.0",

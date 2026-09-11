@@ -2,92 +2,39 @@
 
 A mobile-first personal desktop for independent Cloudflare applications.
 
-The existing apps stay in their own repositories and Workers. This project stores only metadata about them: URL, name, icon, category, accent, visibility, Dock state and future widget endpoint.
+The existing apps stay in their own repositories and Workers. This project stores only registry metadata: URL, name, icon, category, accent, visibility, Dock state, display mode and optional future widget endpoint.
 
 ## Stack
 
 - React 19 + Vite + TypeScript
 - Cloudflare Workers
-- D1 — application registry and desktop settings
-- R2 — uploaded custom app icons
+- D1 — app registry, settings and inline custom icon data
 - PWA — installable mobile shell with offline fallback
 
 ## Included apps
 
-The first run automatically seeds:
+The first run seeds Love Letter, Hodynnyk Calendar, WWG QA, myHabbit and Soft Wellness.
 
-1. Love Letter
-2. Hodynnyk Calendar
-3. WWG QA
-4. myHabbit
-5. Soft Wellness
+## Build and deploy
 
-## Local start
+Cloudflare can keep its current deploy command:
 
 ```bash
-npm install
-npm run dev
+npx wrangler deploy
 ```
 
-The latest Wrangler can provision local D1/R2 resources from `wrangler.jsonc`.
+`postinstall` runs `vite build` automatically, so the redirected Wrangler config and `dist/client` are ready before deploy.
 
-## Protect editing before public deploy
+The project intentionally does not require R2, KV or any other Cloudflare product besides Workers + D1.
 
-The Desktop can be publicly readable while mutation endpoints are protected by an admin token.
+## Custom icons
 
-Set it as a Cloudflare secret:
-
-```bash
-npx wrangler secret put ADMIN_TOKEN
-```
-
-Enter the same token in **Settings → Admin access** after deployment. It is stored in `sessionStorage`, so it disappears when the browser session ends.
-
-If `ADMIN_TOKEN` is not configured, writes are allowed. This is convenient for local development but is not recommended for a public deployment.
-
-## Deploy
-
-```bash
-npm run deploy
-```
-
-Cloudflare's Vite plugin builds both the React app and the Worker. `wrangler.jsonc` uses SPA fallback and routes `/api/*` plus `/user-assets/*` through the Worker.
+Uploaded icons up to 300 KB are converted to a `data:` URL and saved with the app record in D1. Remote icon URLs and emoji continue to work too.
 
 ## Adding future apps
 
-Open the installed Desktop:
+Open **Apps → Add application**. You can change name, description, URL, category, icon, accent, background URL, Dock pin, visibility and launch mode. Removing an app only removes its Desktop registry entry; it never deletes the original Worker.
 
-**Apps → Add application**
+## Optional admin protection
 
-You can change:
-
-- name / description
-- URL
-- category
-- emoji or uploaded icon
-- accent color
-- visibility
-- Dock pin
-- same-tab or new-tab launch mode
-- optional future `/api/desktop` widget endpoint
-
-Removing an app removes only the registry entry. It never deletes or modifies the original Worker.
-
-## Future desktop widget convention
-
-An app can later expose an optional endpoint such as:
-
-```text
-https://example.workers.dev/api/desktop
-```
-
-The field already exists in the registry. A future Desktop release can query that endpoint to render live metrics/actions without moving the app into this repository.
-
-## Cloudflare notes
-
-`wrangler.jsonc` intentionally follows Cloudflare's current Vite + Workers SPA pattern. D1 and R2 bindings omit IDs/bucket names so recent Wrangler versions can automatically provision them on deployment. If your Cloudflare account disables automatic provisioning, create the resources manually and let Wrangler write the IDs back into the config.
-
-
-## Cloudflare build note
-
-The repository provisions the named R2 bucket `desktop-hodynnyk-user-assets` during `bun run build`, then Vite builds the Worker/client. No manual R2 setup is required in the Cloudflare dashboard.
+The API supports an optional `ADMIN_TOKEN` Worker secret. If it is not configured, editing remains open. This is intentional so the first deployment works without any manual Cloudflare setup.
