@@ -44,3 +44,8 @@ Wrangler 4.x умеет автоматически создать D1 и R2 из 
 - PWA install/offline shell
 
 Удаление приложения из Desktop **не удаляет исходный Worker**.
+
+
+## Cloudflare build note
+
+The repository provisions the named R2 bucket `desktop-hodynnyk-user-assets` during `bun run build`, then Vite builds the Worker/client. No manual R2 setup is required in the Cloudflare dashboard.

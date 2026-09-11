@@ -86,3 +86,8 @@ The field already exists in the registry. A future Desktop release can query tha
 ## Cloudflare notes
 
 `wrangler.jsonc` intentionally follows Cloudflare's current Vite + Workers SPA pattern. D1 and R2 bindings omit IDs/bucket names so recent Wrangler versions can automatically provision them on deployment. If your Cloudflare account disables automatic provisioning, create the resources manually and let Wrangler write the IDs back into the config.
+
+
+## Cloudflare build note
+
+The repository provisions the named R2 bucket `desktop-hodynnyk-user-assets` during `bun run build`, then Vite builds the Worker/client. No manual R2 setup is required in the Cloudflare dashboard.
