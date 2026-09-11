@@ -3,6 +3,7 @@
   "short_name": "Hodynnyk",
   "description": "Your personal launcher, widgets and command center.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0c1115",
   "theme_color": "#101419",

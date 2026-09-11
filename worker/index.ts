@@ -13,7 +13,7 @@ type AppRow = {
   icon_type: "emoji" | "url";
   accent: string;
   cover_url: string;
-  display_mode: "new-tab" | "same-tab";
+  display_mode: "in-app" | "new-tab" | "same-tab";
   is_pinned: number;
   is_visible: number;
   sort_order: number;
@@ -92,7 +92,7 @@ function ensureSchema(env: Env) {
           icon_type TEXT NOT NULL DEFAULT 'emoji',
           accent TEXT NOT NULL DEFAULT '#8f9dff',
           cover_url TEXT NOT NULL DEFAULT '',
-          display_mode TEXT NOT NULL DEFAULT 'new-tab',
+          display_mode TEXT NOT NULL DEFAULT 'in-app',
           is_pinned INTEGER NOT NULL DEFAULT 0,
           is_visible INTEGER NOT NULL DEFAULT 1,
           sort_order INTEGER NOT NULL DEFAULT 0,
@@ -117,7 +117,7 @@ function ensureSchema(env: Env) {
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           `).bind(
             app.id, app.name, app.description, app.url, app.category, app.icon, "emoji", app.accent, "",
-            "new-tab", 1, 1, app.sort, "", "[]", now, now
+            "in-app", 1, 1, app.sort, "", "[]", now, now
           )
         );
         await env.DB.batch(statements);
@@ -132,6 +132,22 @@ function ensureSchema(env: Env) {
       };
       await env.DB.prepare("INSERT OR IGNORE INTO settings (key,value) VALUES ('desktop',?)")
         .bind(JSON.stringify(defaults)).run();
+
+      // One-time upgrade: the original seeded apps opened with window.open(), which
+      // leaves an installed PWA on mobile. Move only the original shortcuts to the
+      // in-app shell; user-created apps keep their chosen mode.
+      const shellMigration = await env.DB.prepare("SELECT value FROM settings WHERE key='migration:in-app-shell-v1'")
+        .first<{ value: string }>();
+      if (!shellMigration) {
+        const now = new Date().toISOString();
+        const ids = seedApps.map((app) => app.id);
+        await env.DB.batch([
+          env.DB.prepare(`UPDATE apps SET display_mode='in-app', updated_at=?
+            WHERE display_mode='new-tab' AND id IN (?,?,?,?,?)`)
+            .bind(now, ...ids),
+          env.DB.prepare("INSERT INTO settings (key,value) VALUES ('migration:in-app-shell-v1','1')"),
+        ]);
+      }
     })().catch((error) => {
       schemaReady = undefined;
       throw error;
@@ -199,7 +215,7 @@ function normalizeApp(body: Record<string, unknown>, fallbackId?: string) {
     iconType: body.iconType === "url" ? "url" : "emoji",
     accent,
     coverUrl: safeString(body.coverUrl, 2048),
-    displayMode: body.displayMode === "same-tab" ? "same-tab" : "new-tab",
+    displayMode: body.displayMode === "new-tab" ? "new-tab" : body.displayMode === "same-tab" ? "same-tab" : "in-app",
     isPinned: Boolean(body.isPinned),
     isVisible: body.isVisible !== false,
     sortOrder: Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0,

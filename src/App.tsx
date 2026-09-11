@@ -39,7 +39,7 @@ const emptyApp = (index: number): DesktopApp => ({
   iconType: "emoji",
   accent: "#8f9dff",
   coverUrl: "",
-  displayMode: "new-tab",
+  displayMode: "in-app",
   isPinned: false,
   isVisible: true,
   sortOrder: index,
@@ -228,8 +228,9 @@ function EditorModal({
           <label>
             <span>Open mode</span>
             <select value={draft.displayMode} onChange={(e) => patch("displayMode", e.target.value as DesktopApp["displayMode"])}>
-              <option value="new-tab">New tab / app</option>
-              <option value="same-tab">Same tab</option>
+              <option value="in-app">Inside Desktop PWA</option>
+              <option value="same-tab">Same PWA window</option>
+              <option value="new-tab">External browser / new window</option>
             </select>
           </label>
           <label className="form-grid__wide">
@@ -286,6 +287,56 @@ function EditorModal({
   );
 }
 
+function AppViewer({ app, onClose }: { app: DesktopApp; onClose: () => void }) {
+  const [loading, setLoading] = useState(true);
+
+  return (
+    <section className="app-viewer" aria-label={`${app.name} in Desktop`}>
+      <header className="app-viewer__bar glass">
+        <button className="app-viewer__back" onClick={onClose} aria-label="Back to Desktop">
+          <ChevronIcon size={18} />
+          <span>Desktop</span>
+        </button>
+
+        <div className="app-viewer__identity">
+          <AppIcon app={app} size="small" />
+          <span>
+            <strong>{app.name}</strong>
+            <small>{new URL(app.url).hostname}</small>
+          </span>
+        </div>
+
+        <button
+          className="app-viewer__external"
+          onClick={() => window.open(app.url, "_blank", "noopener,noreferrer")}
+          aria-label={`Open ${app.name} in browser`}
+        >
+          <ArrowIcon size={17} />
+          <span>Browser</span>
+        </button>
+      </header>
+
+      <div className="app-viewer__frame-wrap">
+        {loading && (
+          <div className="app-viewer__loading">
+            <AppIcon app={app} size="large" />
+            <strong>Opening {app.name}</strong>
+            <span>Keeping you inside Desktop…</span>
+          </div>
+        )}
+        <iframe
+          className="app-viewer__frame"
+          src={app.url}
+          title={app.name}
+          onLoad={() => setLoading(false)}
+          allow="clipboard-read; clipboard-write; camera; microphone; geolocation; payment; fullscreen"
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [page, setPage] = useState<Page>("home");
   const [apps, setApps] = useState<DesktopApp[]>(defaultApps);
@@ -297,6 +348,7 @@ function App() {
   const [adminToken, setTokenState] = useState(getAdminToken());
   const [tokenDraft, setTokenDraft] = useState(getAdminToken());
   const [toast, setToast] = useState("");
+  const [viewer, setViewer] = useState<DesktopApp | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -327,6 +379,26 @@ function App() {
   }, [palette]);
 
   useEffect(() => {
+    const handlePopState = () => setViewer(null);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!viewer) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeViewer();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [viewer]);
+
+  useEffect(() => {
     document.documentElement.dataset.wallpaper = settings.wallpaper;
     document.documentElement.dataset.glass = settings.glass;
     document.documentElement.dataset.compact = settings.compact ? "true" : "false";
@@ -342,8 +414,23 @@ function App() {
   }, [visibleApps, query]);
 
   function launch(app: DesktopApp) {
-    if (app.displayMode === "same-tab") location.href = app.url;
-    else window.open(app.url, "_blank", "noopener,noreferrer");
+    if (app.displayMode === "new-tab") {
+      window.open(app.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (app.displayMode === "same-tab") {
+      location.href = app.url;
+      return;
+    }
+
+    setViewer(app);
+    history.pushState({ desktopViewer: app.id }, "", `${location.pathname}${location.search}#app=${encodeURIComponent(app.id)}`);
+  }
+
+  function closeViewer() {
+    setViewer(null);
+    if (history.state?.desktopViewer) history.back();
+    else if (location.hash.startsWith("#app=")) history.replaceState(null, "", `${location.pathname}${location.search}`);
   }
 
   async function handleSave(app: DesktopApp) {
@@ -642,7 +729,7 @@ function App() {
               <span className="eyebrow">APPLICATIONS</span>
               {filtered.slice(0, 7).map((app) => (
                 <button key={app.id} onClick={() => { launch(app); setPalette(false); }}>
-                  <AppIcon app={app} size="small" /><span><strong>{app.name}</strong><small>{app.category}</small></span><span>Open ↗</span>
+                  <AppIcon app={app} size="small" /><span><strong>{app.name}</strong><small>{app.category}</small></span><span>Open</span>
                 </button>
               ))}
               <button className="palette-add" onClick={() => { setPalette(false); setEditor({ app: emptyApp(apps.length), existing: false }); }}>
@@ -652,6 +739,8 @@ function App() {
           </div>
         </div>
       )}
+
+      {viewer && <AppViewer app={viewer} onClose={closeViewer} />}
 
       {editor && (
         <EditorModal

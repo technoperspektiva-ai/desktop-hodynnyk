@@ -1,4 +1,4 @@
-export type DisplayMode = "new-tab" | "same-tab";
+export type DisplayMode = "in-app" | "new-tab" | "same-tab";
 
 export type AppAction = {
   id: string;

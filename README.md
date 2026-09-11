@@ -38,3 +38,7 @@ Open **Apps → Add application**. You can change name, description, URL, catego
 ## Optional admin protection
 
 The API supports an optional `ADMIN_TOKEN` Worker secret. If it is not configured, editing remains open. This is intentional so the first deployment works without any manual Cloudflare setup.
+
+
+## PWA in-app shell
+Apps now default to **Inside Desktop PWA**. The Desktop opens connected resources in a full-screen embedded viewer, keeps its own top bar, and uses browser history so the Android/iOS back action returns to Desktop instead of closing the PWA. Apps that block iframe embedding with `X-Frame-Options` or CSP `frame-ancestors` can still be switched to External browser mode.

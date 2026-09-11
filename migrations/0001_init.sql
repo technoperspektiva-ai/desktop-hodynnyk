@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS apps (
   icon_type TEXT NOT NULL DEFAULT 'emoji',
   accent TEXT NOT NULL DEFAULT '#8f9dff',
   cover_url TEXT NOT NULL DEFAULT '',
-  display_mode TEXT NOT NULL DEFAULT 'new-tab',
+  display_mode TEXT NOT NULL DEFAULT 'in-app',
   is_pinned INTEGER NOT NULL DEFAULT 0,
   is_visible INTEGER NOT NULL DEFAULT 1,
   sort_order INTEGER NOT NULL DEFAULT 0,

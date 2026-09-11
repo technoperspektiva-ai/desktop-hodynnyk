@@ -1,4 +1,4 @@
-const CACHE = "desktop-hodynnyk-v1";
+const CACHE = "desktop-hodynnyk-v2";
 const SHELL = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
