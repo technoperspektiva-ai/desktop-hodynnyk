@@ -414,15 +414,10 @@ function App() {
   }, [visibleApps, query]);
 
   function launch(app: DesktopApp) {
-    if (app.displayMode === "new-tab") {
-      window.open(app.url, "_blank", "noopener,noreferrer");
-      return;
-    }
-    if (app.displayMode === "same-tab") {
-      location.href = app.url;
-      return;
-    }
-
+    // App cards always stay inside the installed Desktop PWA.
+    // External navigation on iOS leaves the manifest scope and opens SafariViewController
+    // (the screen with “Done”, address bar and Safari controls). The explicit Browser
+    // button inside AppViewer remains available when the user really wants Safari.
     setViewer(app);
     history.pushState({ desktopViewer: app.id }, "", `${location.pathname}${location.search}#app=${encodeURIComponent(app.id)}`);
   }

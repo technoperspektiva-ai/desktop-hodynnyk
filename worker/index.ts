@@ -143,9 +143,24 @@ function ensureSchema(env: Env) {
         const ids = seedApps.map((app) => app.id);
         await env.DB.batch([
           env.DB.prepare(`UPDATE apps SET display_mode='in-app', updated_at=?
-            WHERE display_mode='new-tab' AND id IN (?,?,?,?,?)`)
+            WHERE id IN (?,?,?,?,?)`)
             .bind(now, ...ids),
           env.DB.prepare("INSERT INTO settings (key,value) VALUES ('migration:in-app-shell-v1','1')"),
+        ]);
+      }
+
+      // v2 repairs databases where the first shell migration had already been marked
+      // complete while some seeded shortcuts were still saved as same-tab/new-tab.
+      const shellMigrationV2 = await env.DB.prepare("SELECT value FROM settings WHERE key='migration:in-app-shell-v2'")
+        .first<{ value: string }>();
+      if (!shellMigrationV2) {
+        const now = new Date().toISOString();
+        const ids = seedApps.map((app) => app.id);
+        await env.DB.batch([
+          env.DB.prepare(`UPDATE apps SET display_mode='in-app', updated_at=?
+            WHERE id IN (?,?,?,?,?)`)
+            .bind(now, ...ids),
+          env.DB.prepare("INSERT INTO settings (key,value) VALUES ('migration:in-app-shell-v2','1')"),
         ]);
       }
     })().catch((error) => {

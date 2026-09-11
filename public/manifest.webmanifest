@@ -2,7 +2,7 @@
   "name": "Desktop Hodynnyk",
   "short_name": "Hodynnyk",
   "description": "Your personal launcher, widgets and command center.",
-  "start_url": "/",
+  "start_url": "/?source=pwa-v3",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0c1115",
@@ -21,5 +21,10 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "id": "/",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
   ]
 }
