@@ -1,6 +1,6 @@
 interface Env {
   DB: D1Database;
-  ASSETS: R2Bucket;
+  USER_ASSETS: R2Bucket;
   ADMIN_TOKEN?: string;
 }
 
@@ -319,7 +319,7 @@ async function handleApi(request: Request, env: Env) {
 
     const extension = value.type === "image/jpeg" ? "jpg" : value.type.split("/")[1].replace("+xml","");
     const key = `${new Date().toISOString().slice(0,10)}/${crypto.randomUUID()}.${extension}`;
-    await env.ASSETS.put(key, value.stream(), {
+    await env.USER_ASSETS.put(key, value.stream(), {
       httpMetadata: { contentType: value.type, cacheControl: "public, max-age=31536000, immutable" },
     });
     return json({ url: `/user-assets/${key}` }, { status: 201 });
@@ -332,7 +332,7 @@ async function handleAsset(request: Request, env: Env) {
   const url = new URL(request.url);
   const key = decodeURIComponent(url.pathname.replace(/^\/user-assets\//, ""));
   if (!key || key.includes("..")) return new Response("Not found", { status: 404 });
-  const object = await env.ASSETS.get(key);
+  const object = await env.USER_ASSETS.get(key);
   if (!object) return new Response("Not found", { status: 404 });
   const headers = new Headers();
   object.writeHttpMetadata(headers);

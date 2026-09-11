@@ -15,7 +15,7 @@
   ],
   "r2_buckets": [
     {
-      "binding": "ASSETS"
+      "binding": "USER_ASSETS"
     }
   ]
 }
