@@ -79,10 +79,11 @@ const seedApps = [
 let schemaReady: Promise<void> | undefined;
 
 function ensureSchema(env: Env) {
+  if (!env.DB || typeof env.DB.prepare !== "function") throw new Error("DB_BINDING_MISSING");
   if (!schemaReady) {
     schemaReady = (async () => {
-      await env.DB.exec(`
-        CREATE TABLE IF NOT EXISTS apps (
+      await env.DB.batch([
+        env.DB.prepare(`CREATE TABLE IF NOT EXISTS apps (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
           description TEXT NOT NULL DEFAULT '',
@@ -100,19 +101,19 @@ function ensureSchema(env: Env) {
           actions_json TEXT NOT NULL DEFAULT '[]',
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS settings (
+        )`),
+        env.DB.prepare(`CREATE TABLE IF NOT EXISTS settings (
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL
-        );
-      `);
+        )`)
+      ]);
 
       const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM apps").first<{ count: number }>();
       if (!count?.count) {
         const now = new Date().toISOString();
         const statements = seedApps.map((app) =>
           env.DB.prepare(`
-            INSERT INTO apps
+            INSERT OR IGNORE INTO apps
             (id,name,description,url,category,icon,icon_type,accent,cover_url,display_mode,is_pinned,is_visible,sort_order,widget_endpoint,actions_json,created_at,updated_at)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           `).bind(
@@ -373,7 +374,13 @@ export default {
       return new Response(null, { status: 404 });
     } catch (error) {
       console.error(error);
-      return json({ error: "Desktop service error" }, { status: 500 });
+      const missing = error instanceof Error && error.message === "DB_BINDING_MISSING";
+      return json({
+        error: missing
+          ? "База даних не підключена. У Cloudflare відкрийте Desktop → Bindings і підключіть існуючу D1 базу з назвою прив’язки DB."
+          : "Не вдалося виконати запит до бази даних. Перевірте журнал Worker у Cloudflare (код DESKTOP_DB_ERROR).",
+        code: missing ? "DB_BINDING_MISSING" : "DESKTOP_DB_ERROR",
+      }, { status: 503 });
     }
   },
 } satisfies ExportedHandler<Env>;

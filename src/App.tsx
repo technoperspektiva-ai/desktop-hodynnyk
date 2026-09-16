@@ -801,7 +801,7 @@ function App() {
         />
       )}
 
-      {toast && <div className="toast glass"><CheckIcon size={17} />{toast}</div>}
+      {toast && <div className="toast glass" role="status">{toast}</div>}
     </div>
   );
 }
