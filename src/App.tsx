@@ -22,6 +22,7 @@ import {
   loadApps,
   loadSettings,
   reorderApps,
+  recoverLocalApps,
   saveApp,
   saveSettings,
   setAdminToken,
@@ -342,6 +343,9 @@ function App() {
   const [apps, setApps] = useState<DesktopApp[]>(defaultApps);
   const [settings, setSettings] = useState<DesktopSettings>(defaultSettings);
   const [ready, setReady] = useState(false);
+  const [syncError, setSyncError] = useState("");
+  const [recovering, setRecovering] = useState(false);
+  const dataRevision = useRef(0);
   const [query, setQuery] = useState("");
   const [editor, setEditor] = useState<{ app: DesktopApp; existing: boolean } | null>(null);
   const [palette, setPalette] = useState(false);
@@ -352,12 +356,40 @@ function App() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    Promise.all([loadApps(), loadSettings()]).then(([loadedApps, loadedSettings]) => {
-      setApps(loadedApps.sort((a, b) => a.sortOrder - b.sortOrder));
-      setSettings(loadedSettings);
-      setReady(true);
-    });
-  }, []);
+    let disposed = false;
+    let running = false;
+    const refresh = async () => {
+      if (running || editor || recovering || document.visibilityState === "hidden") return;
+      running = true;
+      const revision = dataRevision.current;
+      try {
+        const loaded = await loadApps(true);
+        if (!disposed && revision === dataRevision.current) {
+          setApps(loaded.sort((a, b) => a.sortOrder - b.sortOrder));
+          setSyncError("");
+        }
+      } catch (error) {
+        if (!disposed) {
+          setSyncError(error instanceof Error ? error.message : "Не вдалося оновити список.");
+          const cached = await loadApps();
+          if (!disposed && revision === dataRevision.current) setApps(cached);
+        }
+      } finally { running = false; if (!disposed) setReady(true); }
+    };
+    void refresh();
+    void loadSettings().then(value => { if (!disposed) setSettings(value); });
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    const timer = window.setInterval(refresh, 30000);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [editor, recovering]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -430,7 +462,9 @@ function App() {
 
   async function handleSave(app: DesktopApp) {
     const existing = apps.some((item) => item.id === app.id);
+    dataRevision.current++;
     const saved = await saveApp(app, !existing);
+    dataRevision.current++;
     setApps((current) =>
       existing
         ? current.map((item) => (item.id === saved.id ? saved : item))
@@ -440,7 +474,9 @@ function App() {
   }
 
   async function handleDelete(id: string) {
+    dataRevision.current++;
     await deleteApp(id);
+    dataRevision.current++;
     setApps((current) => current.filter((item) => item.id !== id));
     showToast("Shortcut removed. Original app is untouched.");
   }
@@ -457,8 +493,12 @@ function App() {
     const next = [...apps];
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
     const normalized = next.map((item, idx) => ({ ...item, sortOrder: idx }));
-    setApps(normalized);
-    await reorderApps(normalized.map((item) => item.id));
+    dataRevision.current++;
+    try {
+      await reorderApps(normalized.map((item) => item.id));
+      dataRevision.current++;
+      setApps(normalized);
+    } catch (error) { showToast(error instanceof Error ? error.message : "Не вдалося змінити порядок."); }
   }
 
   async function patchSettings(next: DesktopSettings) {
@@ -466,7 +506,8 @@ function App() {
     try {
       await saveSettings(next);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Settings saved locally");
+      setSettings(await loadSettings());
+      showToast(e instanceof Error ? e.message : "Налаштування не збережено на сервері.");
     }
   }
 
@@ -518,6 +559,7 @@ function App() {
           </div>
         </header>
 
+        {syncError && <div className="form-error" role="status">Список може бути застарілим. {syncError}</div>}
         {page === "home" && (
           <div className={`page page-home ${ready ? "is-ready" : ""}`}>
             <section className="hero">
@@ -686,6 +728,18 @@ function App() {
 
               <section className="settings-card glass">
                 <div className="settings-card__title"><span>About this Desktop</span><small>Independent apps, one interface</small></div>
+                <button className="small-button" disabled={recovering} onClick={async () => {
+                  if (!confirm("Відновити на сервері ресурси з резервної копії цього пристрою, яких зараз немає у спільному списку? Раніше видалені ресурси також можуть повернутися.")) return;
+                  setRecovering(true);
+                  dataRevision.current++;
+                  try {
+                    const count = await recoverLocalApps();
+                    setApps(await loadApps(true));
+                    setSyncError("");
+                    showToast(`Відновлено ресурсів: ${count}`);
+                  } catch (error) { showToast(error instanceof Error ? error.message : "Відновлення не завершено."); }
+                  finally { dataRevision.current++; setRecovering(false); }
+                }}>{recovering ? "Відновлення…" : "Відновити локальні ресурси"}</button>
                 <div className="about-stack">
                   <span><strong>Frontend</strong><small>React + Vite + TypeScript</small></span>
                   <span><strong>Platform</strong><small>Cloudflare Workers</small></span>
